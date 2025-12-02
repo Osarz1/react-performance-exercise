@@ -1,5 +1,85 @@
-import React, { useState } from 'react';
-import { HeavyAnalyticsChart } from './HeavyComponents'; 
+import React, { useState, useEffect } from "react";
+
+const makeHugeArray = () =>
+  new Array(3000).fill(0).map((_, i) => ({
+    id: i,
+    text: "Item " + i + " " + new Array(100).fill("x").join(""),
+  }));
+
+function blockCPU(ms = 120) {
+  const start = performance.now();
+  while (performance.now() - start < ms) {
+    // busy loop
+  }
+}
+
+export default function HeavyComponent() {
+  const items = makeHugeArray(); 
+
+  const [input, setInput] = useState("");
+
+  const derivedValue = items.map((i) => Math.random()).join("-"); 
+
+  useEffect(() => {
+    blockCPU(150); 
+  }, [items]); 
+
+  return (
+    <div style={{ border: "2px solid red", padding: 16, marginTop: 32 }}>
+      <h2>HeavyComponent (Intentionally Slow)</h2>
+      <p>
+        This component simulates slow business logic, excessive rendering, and heavy object creation.
+      </p>
+
+      <input
+        value={input}
+        onChange={(e) => {
+          blockCPU(80); // ❌ heavy validation
+          setInput(e.target.value);
+        }}
+        placeholder="Type here (will lag!)"
+      />
+
+      <div style={{ height: 300, overflowY: "scroll", border: "1px solid #ccc", marginTop: 16 }}>
+        {items.map((row, i) => {
+          const computed = row.text
+            .split("")
+            .reverse()
+            .join(""); 
+
+          return (
+            <div
+              key={i}
+              style={{
+                padding: 8,
+                borderBottom: "1px solid #eee",
+                display: "flex",
+                justifyContent: "space-between",
+              }}
+            >
+              <div>
+                <strong>{row.id}</strong> – {computed.substring(0, 60)}
+              </div>
+
+              <button
+                onClick={() => {
+                  blockCPU(200); // ❌ long main thread block
+                  alert("Blocked UI thread for 200ms!");
+                }}
+              >
+                Slow Btn
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      <p style={{ marginTop: 16 }}>
+        Derived: <strong>{derivedValue.slice(0, 100)}</strong>
+      </p>
+    </div>
+  );
+}
 
 export default function SlowStudentDashboard() {
   const [inputValue, setInputValue] = useState('');
