@@ -1,77 +1,58 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useMemo, useCallback, memo, lazy, Suspense } from "react";
 
-const makeHugeArray = () =>
-  new Array(3000).fill(0).map((_, i) => ({
-    id: i,
-    text: "Item " + i + " " + new Array(100).fill("x").join(""),
-  }));
+const items = new Array(3000).fill(0).map((_, i) => ({
+  id: i,
+  text: "Item " + i + " " + new Array(100).fill("x").join(""),
+  computed: ("Item " + i + " " + new Array(100).fill("x").join("")).split("").reverse().join(""),
+}));
 
-function blockCPU(ms = 120) {
-  const start = performance.now();
-  while (performance.now() - start < ms) {
-    // busy loop
-  }
-}
-
-export default function HeavyComponent() {
-  const items = makeHugeArray(); 
-
-  const [input, setInput] = useState("");
-
-  const derivedValue = items.map((i) => Math.random()).join("-"); 
-
-  useEffect(() => {
-    blockCPU(150); 
-  }, [items]); 
+const Row = memo(({ row }) => {
+  const handleClick = useCallback(() => {
+    alert("Button clicked!");
+  }, []);
 
   return (
-    <div style={{ border: "2px solid red", padding: 16, marginTop: 32 }}>
-      <h2>HeavyComponent (Intentionally Slow)</h2>
-      <p>
-        This component simulates slow business logic, excessive rendering, and heavy object creation.
-      </p>
+    <div style={{
+      padding: 8,
+      borderBottom: "1px solid #eee",
+      display: "flex",
+      justifyContent: "space-between",
+    }}>
+      <div>
+        <strong>{row.id}</strong> – {row.computed.substring(0, 60)}
+      </div>
+      <button onClick={handleClick}>Btn</button>
+    </div>
+  );
+});
+
+function HeavyComponent() {
+  const [input, setInput] = useState("");
+
+  const derivedValue = useMemo(
+    () => items.map((i) => i.id).join("-"),
+    []
+  );
+
+  const handleInput = useCallback((e) => {
+    setInput(e.target.value);
+  }, []);
+
+  return (
+    <div style={{ border: "2px solid green", padding: 16, marginTop: 32 }}>
+      <h2>HeavyComponent (Optimized)</h2>
+      <p>Optimized: memoized data, no CPU blocking, memoized rows.</p>
 
       <input
         value={input}
-        onChange={(e) => {
-          blockCPU(80); // ❌ heavy validation
-          setInput(e.target.value);
-        }}
-        placeholder="Type here (will lag!)"
+        onChange={handleInput}
+        placeholder="Type here (smooth now!)"
       />
 
       <div style={{ height: 300, overflowY: "scroll", border: "1px solid #ccc", marginTop: 16 }}>
-        {items.map((row, i) => {
-          const computed = row.text
-            .split("")
-            .reverse()
-            .join(""); 
-
-          return (
-            <div
-              key={i}
-              style={{
-                padding: 8,
-                borderBottom: "1px solid #eee",
-                display: "flex",
-                justifyContent: "space-between",
-              }}
-            >
-              <div>
-                <strong>{row.id}</strong> – {computed.substring(0, 60)}
-              </div>
-
-              <button
-                onClick={() => {
-                  blockCPU(200); // ❌ long main thread block
-                  alert("Blocked UI thread for 200ms!");
-                }}
-              >
-                Slow Btn
-              </button>
-            </div>
-          );
-        })}
+        {items.map((row) => (
+          <Row key={row.id} row={row} />
+        ))}
       </div>
 
       <p style={{ marginTop: 16 }}>
@@ -81,51 +62,73 @@ export default function HeavyComponent() {
   );
 }
 
+const HeavyAnalyticsChart = lazy(() =>
+  Promise.resolve({
+    default: memo(({ config }) => (
+      <div style={{ padding: 16, background: "#222", color: "#fff", borderRadius: 8 }}>
+        Chart (theme: {config.theme}, value: {Math.round(config.value)})
+      </div>
+    )),
+  })
+);
+
 export default function SlowStudentDashboard() {
-  const [inputValue, setInputValue] = useState('');
+  const [inputValue, setInputValue] = useState("");
   const [count, setCount] = useState(0);
 
-  const expensiveCalculation = () => {
-    console.log('Running expensive calculation...');
+  const heavyData = useMemo(() => {
     let result = 0;
-    for (let i = 0; i < 500000000; i++) {
+    for (let i = 0; i < 5000000; i++) {
       result += Math.random();
     }
     return result;
-  };
-  
-  const heavyData = expensiveCalculation(); 
+  }, []);
+
+  const handleCountClick = useCallback(() => {
+    setCount((c) => c + 1);
+  }, []);
+
+  const handleChartUpdate = useCallback(() => {
+    console.log("Chart updated");
+  }, []);
 
   return (
     <div className="dashboard-container">
       <h1>Performance Audit Dashboard</h1>
+
       <div className="hero-section">
-        <img 
-          src="https://via.placeholder.com/1200x600.png" 
-          alt="Large Hero Asset" 
+        <img
+          src="https://via.placeholder.com/800x400.png"
+          alt="Hero"
+          loading="lazy"
+          width={800}
+          height={400}
         />
       </div>
 
       <div className="controls">
         <h2>Interactivity Test</h2>
-        <input 
-          type="text" 
-          value={inputValue} 
-          onChange={(e) => setInputValue(e.target.value)} 
-          placeholder="Type here to feel the lag..." 
+        <input
+          type="text"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          placeholder="Type here (smooth now!)"
         />
-        
-        <button onClick={() => setCount(count + 1)}>
+        <button onClick={handleCountClick}>
           Re-render App (Count: {count})
         </button>
       </div>
 
       <div className="analytics">
-        <HeavyAnalyticsChart 
-          config={{ theme: 'dark', value: heavyData }} 
-          onUpdate={() => console.log('Chart updated')} 
-        />
+        <Suspense fallback={<div>Loading chart...</div>}>
+          <HeavyAnalyticsChart
+            config={{ theme: "dark", value: heavyData }}
+            onUpdate={handleChartUpdate}
+          />
+        </Suspense>
       </div>
+
+      <HeavyComponent />
     </div>
   );
 }
